@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Relatório de Acessibilidade (NBR 9050)</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    h1 { color: #333; }
+    .container { display: flex; gap: 30px; }
+    .imagem { position: relative; }
+    .imagem img { max-width: 600px; border: 1px solid #ccc; }
+    .relatorio { flex: 1; }
+    ul { padding-left: 20px; }
+    li { margin: 5px 0; }
+    button { margin: 5px; padding: 6px 12px; cursor: pointer; }
+    .area-box {
+      position: absolute;
+      border: 2px solid rgba(0, 0, 255, 0.5);
+      background: rgba(0, 0, 255, 0.2);
+      pointer-events: none;
+    }
+    select { margin-bottom: 10px; padding: 6px; }
+    #toast {
+        visibility: hidden;
+        min-width: 200px;
+        margin-left: -100px;
+        background-color: #333;
+        color: #fff;
+        text-align: center;
+        border-radius: 8px;
+        padding: 12px;
+        position: fixed;
+        z-index: 1000;
+        left: 50%;
+        bottom: 30px;
+        font-size: 14px;
+        opacity: 0;
+        transition: opacity 0.5s, bottom 0.5s;
+    }
+    #toast.show {
+        visibility: visible;
+        opacity: 1;
+        bottom: 50px;
+    }
+    .container {
+        display: flex;
+        flex-direction: column; /* padrão: coluna para celulares/tablets */
+        gap: 30px;
+    }
+
+
+  </style>
+</head>
+<body>
+  <h1>🚽 Relatório de Acessibilidade (NBR 9050)</h1>
+
+  <label for="ambiente-select">Selecione o ambiente:</label>
+  <select id="ambiente-select">
+    <option value="Banheiro">Banheiro</option>
+    <option value="Cozinha">Cozinha</option>
+  </select>
+
+  <div class="container">
+    <div class="imagem">
+      <img id="ambiente-img" src="pasta_imagens/banheiro.jpg" alt="Ambiente">
+          </div>
+    <div class="relatorio">
+      <h2>📋 Itens no Relatório</h2>
+      <ul id="relatorio-list"></ul>
+      <button onclick="limparRelatorio()">🧹 Limpar Tudo</button>
+      <button onclick="gerarPDF()">📄 Gerar PDF</button>
+      <button id="limparCache">🗑️ Limpar Cache</button>
+      <button id="adicionar-area">➕ Adicionar Área</button>
+    </div>
+  </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+  <script>
+    const AMBIENTES = {
+      "Banheiro": {
+        "path": "pasta_imagens/banheiro.jpg",
+        "areas": {
+          "Altura Descarga": {xmin: 450, xmax: 486, ymin: 123, ymax: 340, texto: "Altura da Descarga em desacordo com a 9050. Máx 1m."},
+          "Altura Bacia": {xmin: 297, xmax: 411, ymin: 206, ymax: 246, texto: "Altura da Bacia sem assento deve ser entre 43-45cm."}
+        }
+      },
+      "Cozinha": {
+        "path": "pasta_imagens/cozinha.jpg",
+        "areas": {
+          "Corrimão": {xmin: 100, xmax: 200, ymin: 150, ymax: 250, texto: "Corrimão em desacordo com a 9050. Deve estar a 92cm de altura."},
+          "Degrau": {xmin: 300, xmax: 400, ymin: 200, ymax: 260, texto: "Degraus devem ter altura máxima de 18cm e piso mínimo de 28cm."},
+          
+        }
+      }
+    };
+
+    
+    let modoColeta = false;
+    let cliqueCount = 0;
+    let x1, y1, x2, y2;
+    let nomeArea = "", textoArea = "";
+
+    const btnAdicionarArea = document.getElementById("adicionar-area");
+    const img = document.getElementById("ambiente-img");
+
+    btnAdicionarArea.addEventListener("click", () => {
+        nomeArea = prompt("Digite o nome da área:");
+        if (!nomeArea) return;
+        textoArea = prompt("Digite o texto/descrição da norma:");
+        if (!textoArea) return;
+        cliqueCount = 0;
+        modoColeta = true;
+        mostrarToast("Modo coleta ativado: clique no canto superior esquerdo da área.");
+    });
+
+    // Listener de clique na imagem
+    img.addEventListener("click", (e) => {
+        if (modoColeta) {
+            const rect = img.getBoundingClientRect();
+            const x = Math.round(e.clientX - rect.left);
+            const y = Math.round(e.clientY - rect.top);
+
+            if (cliqueCount === 0) {
+                x1 = x; y1 = y;
+                cliqueCount++;
+                mostrarToast("Agora clique no canto inferior direito da área.");
+            } else {
+                x2 = x; y2 = y;
+                cliqueCount = 0;
+                modoColeta = false;
+
+                // Desenha a área temporária
+                const box = document.createElement("div");
+                box.className = "area-box";
+                box.style.left = Math.min(x1,x2) + "px";
+                box.style.top = Math.min(y1,y2) + "px";
+                box.style.width = Math.abs(x2-x1) + "px";
+                box.style.height = Math.abs(y2-y1) + "px";
+                img.parentElement.appendChild(box);
+
+                // Gera objeto pronto para copiar
+                const areaObj = `"${nomeArea}": {xmin: ${Math.min(x1,x2)}, xmax: ${Math.max(x1,x2)}, ymin: ${Math.min(y1,y2)}, ymax: ${Math.max(y1,y2)}, texto: "${textoArea}"}`;
+                console.log(areaObj);
+
+                mostrarToast("✅ Área coletada! Veja o console (F12) para copiar o código.");
+            }
+        } else {
+            // Código original de adicionar ao relatório
+            const rect = img.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+
+            const ambiente = AMBIENTES[ambienteAtual];
+            for (const [nome, params] of Object.entries(ambiente.areas)) {
+                if (x >= params.xmin && x <= params.xmax && y >= params.ymin && y <= params.ymax) {
+                    const novoItem = `${ambienteAtual} - ${nome}: ${params.texto}`;
+                    if (!relatorio.includes(novoItem)) {
+                        relatorio.push(novoItem);
+                        salvarRelatorio();
+                        renderRelatorio();
+                        mostrarToast("✅ " + nome + " adicionado");
+                    }
+                }
+            }
+        }
+    });
+
+
+    document.getElementById("limparCache").addEventListener("click", () => {
+        localStorage.clear();
+        sessionStorage.clear();
+        location.reload();
+    });
+
+    function mostrarToast(mensagem) {
+        const toast = document.getElementById("toast");
+        toast.textContent = mensagem;
+        toast.className = "show";
+        setTimeout(() => { toast.className = toast.className.replace("show", ""); }, 2500);
+    }
+
+    let ambienteAtual = "Banheiro";
+    let relatorio = JSON.parse(localStorage.getItem("relatorio")) || [];
+
+    //const img = document.getElementById("ambiente-img"); // Declaração movida para o topo
+    const relatorioList = document.getElementById("relatorio-list");
+    const ambienteSelect = document.getElementById("ambiente-select");
+
+    ambienteSelect.addEventListener("change", () => {
+      ambienteAtual = ambienteSelect.value;
+      carregarAmbiente();
+    });
+
+    function carregarAmbiente() {
+      const ambiente = AMBIENTES[ambienteAtual];
+      img.src = ambiente.path;
+
+      // Remove áreas antigas
+      document.querySelectorAll(".area-box").forEach(el => el.remove());
+
+      // Redesenha áreas novas depois que imagem carregar
+      img.onload = () => {
+        const container = img.parentElement;
+        for (const [nome, params] of Object.entries(ambiente.areas)) {
+          const box = document.createElement("div");
+          box.className = "area-box";
+          box.style.left = params.xmin + "px";
+          box.style.top = params.ymin + "px";
+          box.style.width = (params.xmax - params.xmin) + "px";
+          box.style.height = (params.ymax - params.ymin) + "px";
+          container.appendChild(box);
+        }
+      };
+    }
+    function salvarRelatorio() {
+      localStorage.setItem("relatorio", JSON.stringify(relatorio));
+    }
+
+    function renderRelatorio() {
+      relatorioList.innerHTML = "";
+      relatorio.forEach((item, i) => {
+        const li = document.createElement("li");
+        li.textContent = item;
+        const btn = document.createElement("button");
+        btn.textContent = "🗑️";
+        btn.onclick = () => { relatorio.splice(i, 1); salvarRelatorio(); renderRelatorio(); };
+        li.appendChild(btn);
+        relatorioList.appendChild(li);
+      });
+    }
+
+    function limparRelatorio() {
+      relatorio = [];
+      salvarRelatorio();
+      renderRelatorio();
+    }
+
+    async function gerarPDF() {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+      doc.text("RELATÓRIO DE ACESSIBILIDADE", 10, 10);
+      let y = 20;
+      relatorio.forEach(item => {
+        doc.text(item, 10, y);
+        y += 10;
+      });
+      doc.save("relatorio_acessibilidade.pdf");
+    }
+
+    // Inicialização
+    carregarAmbiente();
+    renderRelatorio();
+  </script>
+<div id="toast"></div>
+</body>
+</html>
